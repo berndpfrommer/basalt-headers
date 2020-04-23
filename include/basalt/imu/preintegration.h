@@ -68,17 +68,18 @@ class IntegratedImuMeasurement {
   /// accelerometer measurement
   /// @param[out] d_next_d_gyro Jacobian of the predicted state with respect
   /// gyroscope measurement
-  inline static void propagateState(const PoseVelState& curr_state,
-                                    const ImuData& data,
-                                    PoseVelState& next_state,
-                                    MatNN* d_next_d_curr = nullptr,
-                                    MatN3* d_next_d_accel = nullptr,
-                                    MatN3* d_next_d_gyro = nullptr) {
+  inline static int64_t propagateState(const PoseVelState& curr_state,
+                                       const ImuData& data,
+                                       PoseVelState& next_state,
+                                       MatNN* d_next_d_curr = nullptr,
+                                       MatN3* d_next_d_accel = nullptr,
+                                       MatN3* d_next_d_gyro = nullptr,
+                                       int64_t max_dt = 1000000000000LL) {
     BASALT_ASSERT_STREAM(
         data.t_ns > curr_state.t_ns,
         "data.t_ns " << data.t_ns << " curr_state.t_ns " << curr_state.t_ns);
 
-    int64_t dt_ns = data.t_ns - curr_state.t_ns;
+    const int64_t dt_ns = std::min(data.t_ns - curr_state.t_ns, max_dt);
     double dt = dt_ns * 1e-9;
 
     Sophus::SO3d R_w_i_new_2 =
@@ -94,7 +95,6 @@ class IntegratedImuMeasurement {
     next_state.T_w_i.translation() = curr_state.T_w_i.translation() +
                                      curr_state.vel_w_i * dt +
                                      0.5 * accel_world * dt * dt;
-
     if (d_next_d_curr) {
       d_next_d_curr->setIdentity();
       d_next_d_curr->block<3, 3>(0, 6).diagonal().setConstant(dt);
@@ -126,6 +126,7 @@ class IntegratedImuMeasurement {
       d_next_d_gyro->block<3, 3>(0, 0) =
           0.5 * dt * d_next_d_gyro->block<3, 3>(6, 0);
     }
+    return (dt_ns);
   }
 
   /// @brief Default constructor.
@@ -156,8 +157,10 @@ class IntegratedImuMeasurement {
   /// @param[in] accel_cov diagonal of accelerometer noise covariance matrix
   /// @param[in] gyro_cov diagonal of gyroscope noise covariance matrix
   void integrate(const ImuData& data, const Vec3& accel_cov,
-                 const Vec3& gyro_cov) {
+                 const Vec3& gyro_cov, int64_t max_dt = 1000000000000LL) {
     ImuData data_corrected = data;
+    // subtract start time of last image frame, so all time is now relative to
+    // that frame
     data_corrected.t_ns -= start_t_ns;
     data_corrected.accel -= bias_accel_lin;
     data_corrected.gyro -= bias_gyro_lin;
@@ -167,7 +170,8 @@ class IntegratedImuMeasurement {
     MatNN F;
     MatN3 A, G;
 
-    propagateState(delta_state, data_corrected, new_state, &F, &A, &G);
+    adjusted_dt += propagateState(delta_state, data_corrected, new_state, &F,
+                                  &A, &G, max_dt);
 
     delta_state = new_state;
     cov = F * cov * F.transpose() + A * accel_cov.asDiagonal() * A.transpose() +
@@ -185,7 +189,8 @@ class IntegratedImuMeasurement {
   /// @param[out] state1 predicted state
   void predictState(const PoseVelState& state0, const Eigen::Vector3d& g,
                     PoseVelState& state1) const {
-    double dt = delta_state.t_ns * 1e-9;
+    // double dt = delta_state.t_ns * 1e-9; // XXX
+    double dt = get_adj_dt_ns() * 1e-9;
 
     state1.T_w_i.so3() = state0.T_w_i.so3() * delta_state.T_w_i.so3();
     state1.vel_w_i =
@@ -217,7 +222,8 @@ class IntegratedImuMeasurement {
                 const Eigen::Vector3d& curr_ba, MatNN* d_res_d_state0 = nullptr,
                 MatNN* d_res_d_state1 = nullptr, MatN3* d_res_d_bg = nullptr,
                 MatN3* d_res_d_ba = nullptr) const {
-    double dt = delta_state.t_ns * 1e-9;
+    // double dt = delta_state.t_ns * 1e-9;
+    const double dt = get_adj_dt_ns() * 1e-9;
     VecN res;
 
     VecN bg_diff, ba_diff;
@@ -285,6 +291,9 @@ class IntegratedImuMeasurement {
   /// @brief Time duretion of preintegrated measurement in nanoseconds.
   int64_t get_dt_ns() const { return delta_state.t_ns; }
 
+  /// @brief adjusted Time duration of preintegrated measurement in nanoseconds.
+  int64_t get_adj_dt_ns() const { return (adjusted_dt); }
+
   /// @brief Start time of preintegrated measurement in nanoseconds.
   int64_t get_start_t_ns() const { return start_t_ns; }
 
@@ -314,15 +323,14 @@ class IntegratedImuMeasurement {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
-  int64_t start_t_ns;  ///< Integration start time in nanoseconds
-
+  int64_t start_t_ns;        ///< Integration start time in nanoseconds
+  int64_t adjusted_dt{0};    /// integr. time, adjusted for bad data shortening
   PoseVelState delta_state;  ///< Delta state
 
   MatNN cov;              ///< Measurement covariance
   mutable MatNN cov_inv;  ///< Cached inverse of measurement covariance
   mutable bool
       cov_inv_computed;  ///< If the cached inverse covariance is computed
-
   MatN3 d_state_d_ba, d_state_d_bg;
 
   Eigen::Vector3d bias_gyro_lin, bias_accel_lin;
