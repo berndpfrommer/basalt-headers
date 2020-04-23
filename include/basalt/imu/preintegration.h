@@ -68,13 +68,11 @@ class IntegratedImuMeasurement {
   /// accelerometer measurement
   /// @param[out] d_next_d_gyro Jacobian of the predicted state with respect
   /// gyroscope measurement
-  inline static int64_t propagateState(const PoseVelState& curr_state,
-                                       const ImuData& data,
-                                       PoseVelState& next_state,
-                                       MatNN* d_next_d_curr = nullptr,
-                                       MatN3* d_next_d_accel = nullptr,
-                                       MatN3* d_next_d_gyro = nullptr,
-                                       int64_t max_dt = 1000000000000LL) {
+  inline static int64_t propagateState(
+      const PoseVelState& curr_state, const ImuData& data,
+      PoseVelState& next_state, MatNN* d_next_d_curr = nullptr,
+      MatN3* d_next_d_accel = nullptr, MatN3* d_next_d_gyro = nullptr,
+      int64_t max_dt = std::numeric_limits<int64_t>::max()) {
     BASALT_ASSERT_STREAM(
         data.t_ns > curr_state.t_ns,
         "data.t_ns " << data.t_ns << " curr_state.t_ns " << curr_state.t_ns);
