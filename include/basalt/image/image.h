@@ -105,6 +105,29 @@ inline void PitchedCopy(char* dst, unsigned int dst_pitch_bytes,
   }
 }
 
+// evaluation is inspired from ceres-solver
+// spline f is interpolated from 4 values.
+// p0,1,2,3 are f(-1), f(0), f(1), f(2)
+// x is between (0,1) the location where we want to evaluate spline
+// f is spline evaluated at x. dfdx is derivative at x.
+inline void CubHermiteSpline(const double& p0, const double& p1,
+                             const double& p2, const double& p3, const double x,
+                             double* f, double* dfdx) {
+  const double a = 0.5 * (-p0 + 3.0 * p1 - 3.0 * p2 + p3);
+  const double b = 0.5 * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3);
+  const double c = 0.5 * (-p0 + p2);
+  const double d = p1;
+  // Horner schematic for: f = a x^3 + b x^2+ c x+d
+  if (f != NULL) {
+    *f = d + x * (c + x * (b + x * a));
+  }
+
+  // dfdx = 3a x^2 + 2b x + c
+  if (dfdx != NULL) {
+    *dfdx = c + x * (2.0 * b + 3.0 * a * x);
+  }
+}
+
 /// @brief Image class that supports sub-images, interpolation, element access.
 template <typename T>
 struct Image {
@@ -281,17 +304,58 @@ struct Image {
   // Interpolated Pixel Access
   //////////////////////////////////////////////////////
 
+  // image value from bilinear interpolation (accessing 4 pixels)
   template <typename S>
   inline S interp(const Eigen::Matrix<S, 2, 1>& p) const {
     return interp<S>(p[0], p[1]);
   }
 
+  // image value bilinearly. gradient from bilinear central differences
+  // i.e. a central differences image is computed and gradient bilinearly
+  // interpolated there (accessing 12 pixels)
   template <typename S>
   inline Eigen::Matrix<S, 3, 1> interpGrad(
       const Eigen::Matrix<S, 2, 1>& p) const {
     return interpGrad<S>(p[0], p[1]);
   }
 
+  //  image value and gradient from bilinear interpolation (accessing 4 pixels)
+  template <typename S>
+  inline Eigen::Matrix<S, 3, 1> interpGradBilinearExact(
+      const Eigen::Matrix<S, 2, 1>& p) const {
+    return interpGradBilinearExact<S>(p[0], p[1]);
+  }
+
+  // image value from spline interpolation (accessing 16 pixels)
+  // same as ceres-solver interpolation
+  template <typename S>
+  inline double interpCubicSplines(const Eigen::Matrix<S, 2, 1>& p) const {
+    return interpCubicSplines<S>(p[0], p[1]);
+  }
+
+  // image value and gradient from spline interpolation (accessing 16 pixels)
+  // same as ceres-solver interpolation
+  template <typename S>
+  inline Eigen::Matrix<S, 3, 1> interpGradCubicSplines(
+      const Eigen::Matrix<S, 2, 1>& p) const {
+    return interpGradCubicSplines<S>(p[0], p[1]);
+  }
+
+  // clamping on image border to stay consistent with ceres-solver
+  void clamp(int& ixm1, int& ixp1, int& ixp2, int& iym1, int& iyp1,
+             int& iyp2) const {
+    // corner cases negative
+    if (iym1 < 0) iym1 = 0;
+    if (ixm1 < 0) ixm1 = 0;
+
+    // corner cases positive
+    if (ixp1 > w - 1) ixp1 = w - 1;
+    if (ixp2 > w - 1) ixp2 = w - 1;
+    if (iyp1 > h - 1) iyp1 = h - 1;
+    if (iyp2 > h - 1) iyp2 = h - 1;
+  }
+
+  // implementations
   template <typename S>
   inline S interp(S x, S y) const {
     static_assert(std::is_floating_point_v<S>,
@@ -363,6 +427,166 @@ struct Image {
                dx * dy * px1y2;
 
     res[2] = S(0.5) * (res_py - res_my);
+
+    return res;
+  }
+
+  template <typename S>
+  inline double interpCubicSplines(S x, S y) const {
+    double image_value;
+    // p0,1,2,3 are f(-1), f(0), f(1), f(2) at pixel position
+    double p0, p1, p2, p3;
+    // f0,...f3 store function values at subpixel position
+    double f0, f1, f2, f3;
+
+    // get integer ix (column) and integer iy (row)
+    int ix = x;
+    int iy = y;
+    // get x-1, x+1, x+2
+    int ixm1 = ix - 1;
+    int ixp1 = ix + 1;
+    int ixp2 = ix + 2;
+    // get y-1, y+1, y+2
+    int iym1 = iy - 1;
+    int iyp1 = iy + 1;
+    int iyp2 = iy + 2;
+    // clamp pixels to make it ceres-consistent
+    clamp(ixm1, ixp1, ixp2, iym1, iyp1, iyp2);
+
+    // row 0
+    p0 = (*this)(ixm1, iym1);
+    p1 = (*this)(ix, iym1);
+    p2 = (*this)(ixp1, iym1);
+    p3 = (*this)(ixp2, iym1);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f0, NULL);
+
+    // row 1
+    p0 = (*this)(ixm1, iy);
+    p1 = (*this)(ix, iy);
+    p2 = (*this)(ixp1, iy);
+    p3 = (*this)(ixp2, iy);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f1, NULL);
+
+    // row 2
+    p0 = (*this)(ixm1, iyp1);
+    p1 = (*this)(ix, iyp1);
+    p2 = (*this)(ixp1, iyp1);
+    p3 = (*this)(ixp2, iyp1);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f2, NULL);
+
+    // row 3
+    p0 = (*this)(ixm1, iyp2);
+    p1 = (*this)(ix, iyp2);
+    p2 = (*this)(ixp1, iyp2);
+    p3 = (*this)(ixp2, iyp2);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f3, NULL);
+
+    // now, interpolate vertically
+    CubHermiteSpline(f0, f1, f2, f3, y - iy, &image_value, NULL);
+    return image_value;
+  }
+
+  template <typename S>
+  inline Eigen::Matrix<S, 3, 1> interpGradCubicSplines(S x, S y) const {
+    Eigen::Matrix<S, 3, 1> res;
+
+    // get integer x (column) and integer y (row)
+    int ix = x;
+    int iy = y;
+    // p0,1,2,3 are f(-1), f(0), f(1), f(2) at pixel position
+    double p0, p1, p2, p3;
+    // f0,...f3 to store function values at subpixel position
+    double f0, f1, f2, f3;
+    // dfdx for horizontal interpolation along each row at subpixel
+    double df0dx, df1dx, df2dx, df3dx;
+
+    // get x-1, x+1, x+2
+    int ixm1 = ix - 1;
+    int ixp1 = ix + 1;
+    int ixp2 = ix + 2;
+    // get y-1, y+1, y+2
+    int iym1 = iy - 1;
+    int iyp1 = iy + 1;
+    int iyp2 = iy + 2;
+    // to make it consistent with Ceres Interpolator
+    // we clamp the pixel values beyond image border
+    clamp(ixm1, ixp1, ixp2, iym1, iyp1, iyp2);
+
+    // row 0
+    p0 = (*this)(ixm1, iym1);
+    p1 = (*this)(ix, iym1);
+    p2 = (*this)(ixp1, iym1);
+    p3 = (*this)(ixp2, iym1);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f0, &df0dx);
+
+    // row 1
+    p0 = (*this)(ixm1, iy);
+    p1 = (*this)(ix, iy);
+    p2 = (*this)(ixp1, iy);
+    p3 = (*this)(ixp2, iy);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f1, &df1dx);
+
+    // row 2
+    p0 = (*this)(ixm1, iyp1);
+    p1 = (*this)(ix, iyp1);
+    p2 = (*this)(ixp1, iyp1);
+    p3 = (*this)(ixp2, iyp1);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f2, &df2dx);
+
+    // row 3
+    p0 = (*this)(ixm1, iyp2);
+    p1 = (*this)(ix, iyp2);
+    p2 = (*this)(ixp1, iyp2);
+    p3 = (*this)(ixp2, iyp2);
+    CubHermiteSpline(p0, p1, p2, p3, x - ix, &f3, &df3dx);
+
+    // now, interpolate vertically
+    CubHermiteSpline(f0, f1, f2, f3, y - iy, &res[0], &res[2]);
+    CubHermiteSpline(df0dx, df1dx, df2dx, df3dx, y - iy, &res[1], NULL);
+
+    return res;
+  }
+
+  template <typename S>
+  inline Eigen::Matrix<S, 3, 1> interpGradBilinearExact(S x, S y) const {
+    Eigen::Matrix<S, 3, 1> res;
+
+    // getting integer coordinates
+    int ix = x;
+    int iy = y;
+    S dx = x - ix;
+    S dy = y - iy;
+    S ddx = 1.0f - dx;
+    S ddy = 1.0f - dy;
+    // clamping pixel values
+    int ixp1 = ix + 1;
+    int iyp1 = iy + 1;
+    if (ixp1 > w - 1) ixp1 = w - 1;
+    if (iyp1 > h - 1) iyp1 = h - 1;
+
+    // we only require 4 coordinates
+    // for bilinear interpolation
+    const T& px0y0 = (*this)(ix, iy);
+    const T& px1y0 = (*this)(ixp1, iy);
+    const T& px0y1 = (*this)(ix, iyp1);
+    const T& px1y1 = (*this)(ixp1, iyp1);
+
+    // interpolate in x direction (fix y)
+    const double fxy0 = ddx * px0y0 + dx * px1y0;
+    const double fxy1 = ddx * px0y1 + dx * px1y1;
+
+    // image value: normal bilinear interpolation
+    res[0] = fxy0 * ddy + fxy1 * dy;
+
+    // derivative in y direction
+    res[2] = fxy1 - fxy0;
+
+    // interpolate in y direction (fix x)
+    const double fx0y = ddy * px0y0 + dy * px0y1;
+    const double fx1y = ddy * px1y0 + dy * px1y1;
+
+    // derivative in x direction
+    res[1] = fx1y - fx0y;
 
     return res;
   }
