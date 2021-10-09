@@ -61,7 +61,7 @@ set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g0 -DEIGEN_INITIALIZE_MATRICES
 
 set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/eigen")
 set(EIGEN_INCLUDE_DIR_HINTS ${EIGEN_ROOT})
-find_package(Eigen3 3.3.7 REQUIRED)
+find_package(Eigen3 3.4.0 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
 
