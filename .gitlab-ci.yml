@@ -84,26 +84,24 @@ bionic-release-compile:
   <<: *compile_and_test_definition
   image: vladyslavusenko/b_image_bionic:latest
 
-#mojave-relwithdebinfo-compile:
-#  <<: *compile_and_test_definition
-#  tags: [macos, "10.14"]
-#  variables:
-#    BUILD_TYPE: RelWithDebInfo
-
-#mojave-brewedclang-asan-build:
-#  <<: *compile_and_test_definition
-#  tags: [macos, "10.14"]
-#  variables:
-#    CC: /usr/local/opt/llvm/bin/clang
-#    CXX: /usr/local/opt/llvm/bin/clang++
-#    BUILD_TYPE: SanitizerRelWithDebInfo
-
-catalina-brewedclang-asan-build:
+bigsur-relwithdebinfo-compile:
   <<: *compile_and_test_definition
-  tags: [macos, "10.15"]
+  tags: [macos, "11"]
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+
+bigsur-brewedclang-asan-build:
+  <<: *compile_and_test_definition
+  tags: [macos, "11"]
   variables:
     CC: /usr/local/opt/llvm/bin/clang
     CXX: /usr/local/opt/llvm/bin/clang++
+    BUILD_TYPE: SanitizerRelWithDebInfo
+
+catalina-asan-build:
+  <<: *compile_and_test_definition
+  tags: [macos, "10.15"]
+  variables:
     BUILD_TYPE: SanitizerRelWithDebInfo
 
 # check if clang-format would make any changes
