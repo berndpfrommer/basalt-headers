@@ -1,82 +1,131 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.10...3.18)
 
-include("cmake_modules/PreProjectWorkarounds.cmake")
+include(CMakePackageConfigHelpers)
 
-project(basalt-headers)
+project(basalt-headers VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/" ${CMAKE_MODULE_PATH})
+include(GNUInstallDirs)
+include(CTest) # note: this adds a BUILD_TESTING which defaults to ON
 
-if (NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
-  find_program(CCACHE_PROGRAM ccache)
-  if(CCACHE_PROGRAM)
-    message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
-    set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
-    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  if (NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+      message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+      set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
+      set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    else()
+      message(STATUS "Dind't find ccache")
+    endif()
   else()
-    message(STATUS "Dind't find ccache")
+    message(STATUS "Compiler launcher already set. Not configuring ccache.")
+    message(STATUS "CMAKE_C_COMPILER_LAUNCHER: ${CMAKE_C_COMPILER_LAUNCHER}")
+    message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
   endif()
-else()
-  message(STATUS "Compiler launcher already set. Not configuring ccache.")
-  message(STATUS "CMAKE_C_COMPILER_LAUNCHER: ${CMAKE_C_COMPILER_LAUNCHER}")
-  message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
+
+  IF( NOT CMAKE_BUILD_TYPE )
+    SET( CMAKE_BUILD_TYPE Release)
+  ENDIF()
+
+  IF(NOT CXX_MARCH)
+    SET(CXX_MARCH native)
+  ENDIF()
+
+  IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    set(BASALT_HEADERS_MARCH_FLAGS "-march=${CXX_MARCH}")
+  ELSE()
+    message(STATUS "Running on Apple ${CMAKE_SYSTEM_PROCESSOR}. Disabled -march flag.")
+  ENDIF()
+
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+
+
+  # clang-specific compile flags
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-exceptions -fcolor-diagnostics -frelaxed-template-template-args -Wno-error=deprecated-declarations")
+
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+      # These are disabled to avoid lot's of warnings in Eigen code with clang 10
+      set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-misleading-indentation")
+    endif()
+  else()
+    set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-error=maybe-uninitialized")
+  endif()
+
+
+  set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          # cmake default: "-g"
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                      # cmake default: "-O3 -DNDEBUG"
+  SET(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra ${BASALT_HEADERS_MARCH_FLAGS} ${CMAKE_CXX_FLAGS} ${BASALT_HEADERS_CXX_FLAGS}")
+  SET(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fno-inline -fno-inline-small-functions -fno-default-inline")
+  SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
+  SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} --coverage")
+  set(CMAKE_CXX_FLAGS_SANITIZERDEBUG "-O0 -g0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
+  set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
+
 endif()
 
-IF( NOT CMAKE_BUILD_TYPE )
-   SET( CMAKE_BUILD_TYPE Release)
-ENDIF()
-
-IF(NOT CXX_MARCH)
-   SET(CXX_MARCH native)
-ENDIF()
-
-IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-  set(BASALT_HEADERS_MARCH_FLAGS "-march=${CXX_MARCH}")
-ELSE()
-  message(STATUS "Running on Apple ${CMAKE_SYSTEM_PROCESSOR}. Disabled -march flag.")
-ENDIF()
-
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-
-# clang-specific compile flags
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-exceptions -fcolor-diagnostics -frelaxed-template-template-args -Wno-error=deprecated-declarations")
-
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
-    # These are disabled to avoid lot's of warnings in Eigen code with clang 10
-    set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-error=misleading-indentation")
+option(BASALT_BUILTIN_EIGEN "Use builtin Eigen from submodule" ON)
+if(NOT TARGET Eigen3::Eigen)
+  if(BASALT_BUILTIN_EIGEN)
+    message(STATUS "Including internal Eigen from submodule")
+    # Disable Eigen tests
+    set(BUILD_TESTING_PREV_VALUE ${BUILD_TESTING})  # Note: BUILD_TESTING is always defined because we include CTest above
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
+    add_subdirectory(thirdparty/eigen EXCLUDE_FROM_ALL)
+    # Restore previous value of BUILD_TESTING
+    set(BUILD_TESTING ${BUILD_TESTING_PREV_VALUE} CACHE BOOL "Build the testing tree." FORCE)
+  else()
+    message(STATUS "Finding external Eigen")
+    find_package(Eigen3 3.4 REQUIRED)
   endif()
 else()
-  set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-error=maybe-uninitialized")
+  message(STATUS "Eigen already available")
 endif()
 
+option(BASALT_BUILTIN_SOPHUS "Use builtin Sophus from submodule" ON)
+if(NOT TARGET Sophus::Sophus)
+  if(BASALT_BUILTIN_SOPHUS)
+    message(STATUS "Including internal Sophus from submodule")
+    set(BUILD_SOPHUS_TESTS OFF CACHE BOOL "disable BUILD_SOPHUS_TESTS")
+    set(BUILD_SOPHUS_EXAMPLES OFF CACHE BOOL "disable BUILD_SOPHUS_EXAMPLES")
+    add_subdirectory(thirdparty/Sophus EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Finding external Sophus")
+    find_package(Sophus REQUIRED)
+  endif()
+else()
+  message(STATUS "Sophus already available")
+endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          # cmake default: "-g"
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                      # cmake default: "-O3 -DNDEBUG"
-SET(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra ${BASALT_HEADERS_MARCH_FLAGS} ${CMAKE_CXX_FLAGS} ${BASALT_HEADERS_CXX_FLAGS}")
-SET(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fno-inline -fno-inline-small-functions -fno-default-inline")
-SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
-SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} --coverage")
-set(CMAKE_CXX_FLAGS_SANITIZERDEBUG "-O0 -g0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
-set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g0 -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
+option(BASALT_BUILTIN_CEREAL "Use builtin Cereal from submodule" ON)
+if(NOT TARGET cereal::cereal)
+  if(BASALT_BUILTIN_CEREAL)
+    message(STATUS "Including internal Cereal from submodule")
+    add_subdirectory(thirdparty/cereal EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Finding external Cereal")
+    find_package(cereal REQUIRED)
+  endif()
+else()
+  message(STATUS "Cereal already available")
+endif()
 
+add_library(basalt-headers INTERFACE)
+add_library (basalt::basalt-headers ALIAS basalt-headers)
+target_link_libraries(basalt-headers INTERFACE Eigen3::Eigen Sophus::Sophus cereal::cereal)
 
-set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/eigen")
-set(EIGEN_INCLUDE_DIR_HINTS ${EIGEN_ROOT})
-find_package(Eigen3 3.4.0 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
-message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
+# Associate target with include directory
+target_include_directories(basalt-headers INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 
-include_directories(thirdparty/Sophus)
-include_directories(thirdparty/cereal/include)
-include_directories(include)
-
-enable_testing()
-add_subdirectory(test)
-
-
-
+if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR BASALT_HEADERS_BUILD_TESTING) AND BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(test)
+endif()

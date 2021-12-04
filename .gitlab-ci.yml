@@ -74,11 +74,6 @@ focal-asan-build:
     # LeakSanitizer doesn't work in (non-priviliged) container
     ASAN_OPTIONS: "detect_leaks=0"
 
-xenial-release-compile:
-  <<: *prepare_docker_definition
-  <<: *compile_and_test_definition
-  image: vladyslavusenko/b_image_xenial:latest
-
 bionic-release-compile:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
