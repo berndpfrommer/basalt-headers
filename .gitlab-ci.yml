@@ -81,13 +81,13 @@ bionic-release-compile:
 
 bigsur-relwithdebinfo-compile:
   <<: *compile_and_test_definition
-  tags: [macos, "11"]
+  tags: [macos, "11", x86_64]
   variables:
     BUILD_TYPE: RelWithDebInfo
 
 bigsur-brewedclang-asan-build:
   <<: *compile_and_test_definition
-  tags: [macos, "11"]
+  tags: [macos, "11", x86_64]
   variables:
     CC: /usr/local/opt/llvm/bin/clang
     CXX: /usr/local/opt/llvm/bin/clang++
@@ -98,6 +98,12 @@ catalina-asan-build:
   tags: [macos, "10.15"]
   variables:
     BUILD_TYPE: SanitizerRelWithDebInfo
+
+monterey-arm-relwithdebinfo-compile:
+  <<: *compile_and_test_definition
+  tags: [macos, "12", arm64]
+  variables:
+    BUILD_TYPE: RelWithDebInfo
 
 # check if clang-format would make any changes
 clang-format:
