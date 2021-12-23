@@ -284,7 +284,7 @@ class KannalaBrandtCamera4 {
   /// \ref unproject function.
   ///
   /// @param ITER number of iterations
-  /// @param[in] r_theta number of iterations
+  /// @param[in] r_theta initial theta estimate
   /// @param[out] d_func_d_theta derivative of the function with respect to
   /// theta at the solution
   /// @returns theta - root of the polynomial

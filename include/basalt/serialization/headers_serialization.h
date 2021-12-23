@@ -157,6 +157,36 @@ inline void load(Archive& ar, basalt::PinholeCamera<Scalar>& cam) {
 }
 
 template <class Archive, class Scalar>
+inline void save(Archive& ar, const basalt::PinholeRadtan8Camera<Scalar>& cam) {
+  ar(cereal::make_nvp("fx", cam.getParam()[0]),
+     cereal::make_nvp("fy", cam.getParam()[1]),
+     cereal::make_nvp("cx", cam.getParam()[2]),
+     cereal::make_nvp("cy", cam.getParam()[3]),
+     cereal::make_nvp("k1", cam.getParam()[4]),
+     cereal::make_nvp("k2", cam.getParam()[5]),
+     cereal::make_nvp("p1", cam.getParam()[6]),
+     cereal::make_nvp("p2", cam.getParam()[7]),
+     cereal::make_nvp("k3", cam.getParam()[8]),
+     cereal::make_nvp("k4", cam.getParam()[9]),
+     cereal::make_nvp("k5", cam.getParam()[10]),
+     cereal::make_nvp("k6", cam.getParam()[11]));
+}
+
+template <class Archive, class Scalar>
+inline void load(Archive& ar, basalt::PinholeRadtan8Camera<Scalar>& cam) {
+  Eigen::Matrix<Scalar, 12, 1> intr;
+
+  ar(cereal::make_nvp("fx", intr[0]), cereal::make_nvp("fy", intr[1]),
+     cereal::make_nvp("cx", intr[2]), cereal::make_nvp("cy", intr[3]),
+     cereal::make_nvp("k1", intr[4]), cereal::make_nvp("k2", intr[5]),
+     cereal::make_nvp("p1", intr[6]), cereal::make_nvp("p2", intr[7]),
+     cereal::make_nvp("k3", intr[8]), cereal::make_nvp("k4", intr[9]),
+     cereal::make_nvp("k5", intr[10]), cereal::make_nvp("k6", intr[11]));
+
+  cam = basalt::PinholeRadtan8Camera<Scalar>(intr);
+}
+
+template <class Archive, class Scalar>
 inline void save(Archive& ar, const basalt::DoubleSphereCamera<Scalar>& cam) {
   ar(cereal::make_nvp("fx", cam.getParam()[0]),
      cereal::make_nvp("fy", cam.getParam()[1]),

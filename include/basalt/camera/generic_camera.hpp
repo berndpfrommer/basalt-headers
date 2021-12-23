@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/camera/fov_camera.hpp>
 #include <basalt/camera/kannala_brandt_camera4.hpp>
 #include <basalt/camera/pinhole_camera.hpp>
+#include <basalt/camera/pinhole_radtan8_camera.hpp>
 #include <basalt/camera/unified_camera.hpp>
 
 #include <variant>
@@ -69,11 +70,11 @@ class GenericCamera {
   using Mat42 = Eigen::Matrix<Scalar, 4, 2>;
   using Mat4 = Eigen::Matrix<Scalar, 4, 4>;
 
+  /// Possible variants of camera models.
   using VariantT =
       std::variant<ExtendedUnifiedCamera<Scalar>, DoubleSphereCamera<Scalar>,
                    KannalaBrandtCamera4<Scalar>, UnifiedCamera<Scalar>,
-                   PinholeCamera<Scalar>>;  ///< Possible variants of camera
-                                            ///< models.
+                   PinholeCamera<Scalar>, PinholeRadtan8Camera<Scalar>>;
 
  public:
   /// @brief Cast to different scalar type

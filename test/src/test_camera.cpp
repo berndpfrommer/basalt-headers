@@ -309,6 +309,13 @@ TEST(CameraTestCase, PinholeProjectJacobiansFloat) {
   testProjectJacobian<basalt::PinholeCamera<float>>();
 }
 
+TEST(CameraTestCase, PinholeRadtan8ProjectJacobians) {
+  testProjectJacobian<basalt::PinholeRadtan8Camera<double>>();
+}
+TEST(CameraTestCase, PinholeRadtan8ProjectJacobiansFloat) {
+  testProjectJacobian<basalt::PinholeRadtan8Camera<float>>();
+}
+
 TEST(CameraTestCase, UnifiedProjectJacobians) {
   testProjectJacobian<basalt::UnifiedCamera<double>>();
 }
@@ -353,6 +360,13 @@ TEST(CameraTestCase, PinholeProjectUnproject) {
 TEST(CameraTestCase, PinholeProjectUnprojectFloat) {
   testProjectUnproject<basalt::PinholeCamera<float>>();
 }
+
+// TEST(CameraTestCase, PinholeRadtan8ProjectUnproject) {
+//   testProjectUnproject<basalt::PinholeRadtan8Camera<double>>();
+// }
+// TEST(CameraTestCase, PinholeRadtan8ProjectUnprojectFloat) {
+//   testProjectUnproject<basalt::PinholeRadtan8Camera<float>>();
+// }
 
 TEST(CameraTestCase, UnifiedProjectUnproject) {
   testProjectUnproject<basalt::UnifiedCamera<double>>();
@@ -407,6 +421,13 @@ TEST(CameraTestCase, PinholeUnprojectJacobiansFloat) {
   testUnprojectJacobians<basalt::PinholeCamera<float>>();
 }
 
+// TEST(CameraTestCase, PinholeRadtan8UnprojectJacobians) {
+//   testUnprojectJacobians<basalt::PinholeRadtan8Camera<double>>();
+// }
+// TEST(CameraTestCase, PinholeRadtan8UnprojectJacobiansFloat) {
+//   testUnprojectJacobians<basalt::PinholeRadtan8Camera<float>>();
+// }
+
 TEST(CameraTestCase, UnifiedUnprojectJacobians) {
   testUnprojectJacobians<basalt::UnifiedCamera<double>>();
 }
@@ -449,6 +470,13 @@ TEST(CameraTestCase, PinholeProjectJacobians3) {
 }
 TEST(CameraTestCase, PinholeProjectJacobiansFloat3) {
   testProjectJacobian3<basalt::PinholeCamera<float>>();
+}
+
+TEST(CameraTestCase, PinholeRadtan8ProjectJacobians3) {
+  testProjectJacobian3<basalt::PinholeRadtan8Camera<double>>();
+}
+TEST(CameraTestCase, PinholeRadtan8ProjectJacobiansFloat3) {
+  testProjectJacobian3<basalt::PinholeRadtan8Camera<float>>();
 }
 
 TEST(CameraTestCase, UnifiedProjectJacobians3) {
@@ -495,6 +523,13 @@ TEST(CameraTestCase, PinholeUnprojectJacobians3) {
 TEST(CameraTestCase, PinholeUnprojectJacobiansFloat3) {
   testUnprojectJacobians3<basalt::PinholeCamera<float>>();
 }
+
+// TEST(CameraTestCase, PinholeRadtan8UnprojectJacobians3) {
+//   testUnprojectJacobians3<basalt::PinholeRadtan8Camera<double>>();
+// }
+// TEST(CameraTestCase, PinholeRadtan8UnprojectJacobiansFloat3) {
+//   testUnprojectJacobians3<basalt::PinholeRadtan8Camera<float>>();
+// }
 
 TEST(CameraTestCase, UnifiedUnprojectJacobians3) {
   testUnprojectJacobians3<basalt::UnifiedCamera<double>>();
