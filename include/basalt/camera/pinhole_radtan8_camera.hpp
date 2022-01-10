@@ -64,6 +64,7 @@ class PinholeRadtan8Camera {
 
   using VecN = Eigen::Matrix<Scalar, N, 1>;
 
+  using Mat22 = Eigen::Matrix<Scalar, 2, 2>;
   using Mat24 = Eigen::Matrix<Scalar, 2, 4>;
   using Mat2N = Eigen::Matrix<Scalar, 2, N>;
 
@@ -188,11 +189,11 @@ class PinholeRadtan8Camera {
     proj[0] = u;
     proj[1] = v;
 
+    const bool is_valid = z >= Sophus::Constants<Scalar>::epsilonSqrt();
+
     // The following derivative formulas were computed automatically with sympy
     // (with `diff`, `simplify`, and `cse`) from the previous definition. Don't
     // try to understand them.
-
-    const bool is_valid = z >= Sophus::Constants<Scalar>::epsilonSqrt();
 
     if constexpr (!std::is_same_v<DerivedJ3D, std::nullptr_t>) {
       BASALT_ASSERT(d_proj_d_p3d);
@@ -346,6 +347,80 @@ class PinholeRadtan8Camera {
     return is_valid;
   }
 
+  /// @brief Distorts a normalized 2D point
+  ///
+  /// Given \f$ (x', y') \f$ computes \f$ (x'', y'') \f$ as defined @ref
+  /// project. It can also optionally compute its jacobian.
+  /// @param[in] undist Undistorted normalized 2D point \f$ (x', y') \f$
+  /// @param[out] dist Result of distortion \f$ (x'', y'') \f$
+  /// @param[out] d_dist_d_undist if not nullptr, computed Jacobian of @p dist
+  /// w.r.t @p undist
+  template <class DerivedJundist = std::nullptr_t>
+  inline void distort(const Vec2& undist, Vec2& dist,
+                      DerivedJundist d_dist_d_undist = nullptr) const {
+    const Scalar& k1 = param_[4];
+    const Scalar& k2 = param_[5];
+    const Scalar& p1 = param_[6];
+    const Scalar& p2 = param_[7];
+    const Scalar& k3 = param_[8];
+    const Scalar& k4 = param_[9];
+    const Scalar& k5 = param_[10];
+    const Scalar& k6 = param_[11];
+
+    const Scalar xp = undist.x();
+    const Scalar yp = undist.y();
+    const Scalar r2 = xp * xp + yp * yp;
+    const Scalar cdist = (1 + r2 * (k1 + r2 * (k2 + r2 * k3))) /
+                         (1 + r2 * (k4 + r2 * (k5 + r2 * k6)));
+    const Scalar deltaX = 2 * p1 * xp * yp + p2 * (r2 + 2 * xp * xp);
+    const Scalar deltaY = 2 * p2 * xp * yp + p1 * (r2 + 2 * yp * yp);
+    const Scalar xpp = xp * cdist + deltaX;
+    const Scalar ypp = yp * cdist + deltaY;
+    dist.x() = xpp;
+    dist.y() = ypp;
+
+    if constexpr (!std::is_same_v<DerivedJundist, std::nullptr_t>) {
+      BASALT_ASSERT(d_dist_d_undist);
+
+      // Expressions derived with sympy
+      const Scalar v0 = xp * xp;
+      const Scalar v1 = yp * yp;
+      const Scalar v2 = v0 + v1;
+      const Scalar v3 = k6 * v2;
+      const Scalar v4 = k4 + v2 * (k5 + v3);
+      const Scalar v5 = v2 * v4 + 1;
+      const Scalar v6 = v5 * v5;
+      const Scalar v7 = 1 / v6;
+      const Scalar v8 = p1 * yp;
+      const Scalar v9 = p2 * xp;
+      const Scalar v10 = 2 * v6;
+      const Scalar v11 = k3 * v2;
+      const Scalar v12 = k1 + v2 * (k2 + v11);
+      const Scalar v13 = v12 * v2 + 1;
+      const Scalar v14 = v13 * (v2 * (k5 + 2 * v3) + v4);
+      const Scalar v15 = 2 * v14;
+      const Scalar v16 = v12 + v2 * (k2 + 2 * v11);
+      const Scalar v17 = 2 * v16;
+      const Scalar v18 = xp * yp;
+      const Scalar v19 =
+          2 * v7 * (-v14 * v18 + v16 * v18 * v5 + v6 * (p1 * xp + p2 * yp));
+
+      const Scalar dxpp_dxp =
+          v7 * (-v0 * v15 + v10 * (v8 + 3 * v9) + v5 * (v0 * v17 + v13));
+      const Scalar dxpp_dyp = v19;
+      const Scalar dypp_dxp = v19;
+      const Scalar dypp_dyp =
+          v7 * (-v1 * v15 + v10 * (3 * v8 + v9) + v5 * (v1 * v17 + v13));
+
+      (*d_dist_d_undist)(0, 0) = dxpp_dxp;
+      (*d_dist_d_undist)(0, 1) = dxpp_dyp;
+      (*d_dist_d_undist)(1, 0) = dypp_dxp;
+      (*d_dist_d_undist)(1, 1) = dypp_dyp;
+    } else {
+      UNUSED(d_dist_d_undist);
+    }
+  }
+
   /// @brief Unproject the point
   /// @note Computing the jacobians is not implemented
   ///
@@ -400,9 +475,9 @@ class PinholeRadtan8Camera {
   ///
   /// @param[in] proj point to unproject
   /// @param[out] p3d result of unprojection
-  /// @param[out] d_p3d_d_proj \b UNIMPLEMENTED if not nullptr computed
+  /// @param[out] d_p3d_d_proj \b UNIMPLEMENTED if not nullptr, computed
   /// Jacobian of unprojection with respect to proj
-  /// @param[out] d_p3d_d_param \b UNIMPLEMENTED point if not nullptr computed
+  /// @param[out] d_p3d_d_param \b UNIMPLEMENTED if not nullptr, computed
   /// Jacobian of unprojection with respect to intrinsic parameters
   /// @return if unprojection is valid
   template <class DerivedPoint2D, class DerivedPoint3D,
@@ -420,14 +495,6 @@ class PinholeRadtan8Camera {
     const Scalar& fy = param_[1];
     const Scalar& cx = param_[2];
     const Scalar& cy = param_[3];
-    const Scalar& k1 = param_[4];
-    const Scalar& k2 = param_[5];
-    const Scalar& p1 = param_[6];
-    const Scalar& p2 = param_[7];
-    const Scalar& k3 = param_[8];
-    const Scalar& k4 = param_[9];
-    const Scalar& k5 = param_[10];
-    const Scalar& k6 = param_[11];
 
     const Scalar& u = proj_eval[0];
     const Scalar& v = proj_eval[1];
@@ -435,21 +502,24 @@ class PinholeRadtan8Camera {
     const Scalar x0 = (u - cx) / fx;
     const Scalar y0 = (v - cy) / fy;
 
-    // Jacobi solver, same as OpenCV undistortPoints
-    Scalar mx = x0;
-    Scalar my = y0;
-    constexpr int N = 5;  // Number of iterations
+    // Newton solver
+    Vec2 dist{x0, y0};
+    Vec2 undist{dist};
+    const Scalar EPS = Sophus::Constants<Scalar>::epsilonSqrt();
+    constexpr int N = 20;  // Max iterations
     for (int i = 0; i < N; i++) {
-      const Scalar r2 = mx * mx + my * my;
-      const Scalar icdist = (1 + r2 * (k4 + r2 * (k5 + r2 * k6))) /
-                            (1 + r2 * (k1 + r2 * (k2 + r2 * k3)));
-      BASALT_ASSERT(icdist > 0);  // OpenCV just sets mx=x0, my=y0 instead
-      const Scalar deltaX = 2 * p1 * mx * my + p2 * (r2 + 2 * mx * mx);
-      const Scalar deltaY = 2 * p2 * mx * my + p1 * (r2 + 2 * my * my);
-      mx = (x0 - deltaX) * icdist;
-      my = (y0 - deltaY) * icdist;
+      Mat22 J{};
+      Vec2 fundist{};
+      distort(undist, fundist, &J);
+      Vec2 residual = fundist - dist;
+      undist -= J.inverse() * residual;
+      if (residual.squaredNorm() < EPS) {
+        break;
+      }
     }
 
+    const Scalar mx = undist.x();
+    const Scalar my = undist.y();
     const Scalar norm_inv = 1 / sqrt(mx * mx + my * my + 1);
     p3d.setZero();
     p3d[0] = mx * norm_inv;
