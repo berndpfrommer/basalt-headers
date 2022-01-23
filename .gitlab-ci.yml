@@ -24,9 +24,10 @@ variables:
   script:
     - mkdir build
     - cd build
+    - cmake --version
     - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
     - make -j4
-    - ctest
+    - ctest --output-on-failure
 
 # main build with benchmark and coverage
 focal-release-compile:
@@ -35,16 +36,17 @@ focal-release-compile:
   script:
     - mkdir build
     - cd build
+    - cmake --version
     - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
     - make -j4
-    - ctest
+    - ctest --output-on-failure
     - ./test/benchmark_camera > ../benchmark_camera.txt
     - cd ../
     - mkdir build_coverage
     - cd build_coverage
     - cmake .. -DCMAKE_BUILD_TYPE=Coverage
     - make -j4
-    - ctest
+    - ctest --output-on-failure
     - lcov --directory . --capture --output-file coverage.info
     - lcov --remove coverage.info '*test/*' '/usr/*' '*thirdparty*' '*googletest*' --output-file coverage.info
     - lcov --list coverage.info
