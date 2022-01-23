@@ -57,6 +57,8 @@ enable_testing()
 
 gtest_discover_tests(test_image)
 gtest_discover_tests(test_spline)
+gtest_discover_tests(test_spline_se3)
 gtest_discover_tests(test_camera)
 gtest_discover_tests(test_sophus)
 gtest_discover_tests(test_preintegration)
+gtest_discover_tests(test_ceres_spline_helper)
