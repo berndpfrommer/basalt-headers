@@ -11,7 +11,7 @@ void setImageData(uint16_t* image_array, int size) {
   norm /= (double)std::numeric_limits<uint16_t>::max();
 
   for (int i = 0; i < size; i++) {
-    image_array[i] = (unsigned char)(rand() / norm);
+    image_array[i] = (uint16_t)(rand() / norm);
   }
 }
 
