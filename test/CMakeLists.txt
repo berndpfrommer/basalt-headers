@@ -10,6 +10,8 @@ target_link_libraries(basalt-headers-test-utils INTERFACE gtest)
 
 target_include_directories(basalt-headers-test-utils INTERFACE include)
 
+target_compile_definitions(basalt-headers-test-utils INTERFACE BASALT_ENABLE_BOUNDS_CHECKS)
+
 # List all header files with target_sources.
 # This ensures, e.g., that QtCreator >= 6.0 properly recognize these headers to belong to the project.
 # To support cmake < 3.13, use absolute paths (see: https://crascit.com/2016/01/31/enhanced-source-file-handling-with-target_sources/)
