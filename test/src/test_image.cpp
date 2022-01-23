@@ -22,7 +22,7 @@ TEST(Image, ImageInterpolate) {
   setImageData(img.ptr, img.size());
 
   double eps = 1e-12;
-  double threshold = 1e-7;
+  double threshold = 1e-6;
 
   {
     const Eigen::Vector2i& pi = offset;
