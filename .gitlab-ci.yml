@@ -29,6 +29,18 @@ variables:
     - make -j4
     - ctest --output-on-failure
 
+# template for secondary build & unit test configurations (no builtin libs)
+.compile_and_test_no_builtin_template: &compile_and_test_no_builtin_definition
+  stage: build
+  script:
+    - scripts/ci-install-deps.sh ${BUILD_TYPE}
+    - mkdir build
+    - cd build
+    - cmake --version
+    - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE}  -DBASALT_BUILTIN_EIGEN=OFF -DBASALT_BUILTIN_SOPHUS=Off -DBASALT_BUILTIN_CEREAL=OFF -DCMAKE_PREFIX_PATH="$PWD/../external/install"
+    - make -j4
+    - ctest --output-on-failure
+
 # main build with benchmark and coverage
 focal-release-compile:
   <<: *prepare_docker_definition
@@ -76,6 +88,10 @@ focal-asan-build:
     # LeakSanitizer doesn't work in (non-priviliged) container
     ASAN_OPTIONS: "detect_leaks=0"
 
+focal-release-no-builtin:
+  <<: *prepare_docker_definition
+  <<: *compile_and_test_no_builtin_definition
+
 bionic-release-compile:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
@@ -100,6 +116,10 @@ catalina-asan-build:
   tags: [macos, "10.15"]
   variables:
     BUILD_TYPE: SanitizerRelWithDebInfo
+
+catalina-build-no-builtin:
+  <<: *compile_and_test_no_builtin_definition
+  tags: [macos, "10.15"]
 
 monterey-arm-relwithdebinfo-compile:
   <<: *compile_and_test_definition
