@@ -361,12 +361,12 @@ TEST(CameraTestCase, PinholeProjectUnprojectFloat) {
   testProjectUnproject<basalt::PinholeCamera<float>>();
 }
 
-// TEST(CameraTestCase, PinholeRadtan8ProjectUnproject) {
-//   testProjectUnproject<basalt::PinholeRadtan8Camera<double>>();
-// }
-// TEST(CameraTestCase, PinholeRadtan8ProjectUnprojectFloat) {
-//   testProjectUnproject<basalt::PinholeRadtan8Camera<float>>();
-// }
+TEST(CameraTestCase, PinholeRadtan8ProjectUnproject) {
+  testProjectUnproject<basalt::PinholeRadtan8Camera<double>>();
+}
+TEST(CameraTestCase, PinholeRadtan8ProjectUnprojectFloat) {
+  testProjectUnproject<basalt::PinholeRadtan8Camera<float>>();
+}
 
 TEST(CameraTestCase, UnifiedProjectUnproject) {
   testProjectUnproject<basalt::UnifiedCamera<double>>();

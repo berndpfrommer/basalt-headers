@@ -169,21 +169,24 @@ inline void save(Archive& ar, const basalt::PinholeRadtan8Camera<Scalar>& cam) {
      cereal::make_nvp("k3", cam.getParam()[8]),
      cereal::make_nvp("k4", cam.getParam()[9]),
      cereal::make_nvp("k5", cam.getParam()[10]),
-     cereal::make_nvp("k6", cam.getParam()[11]));
+     cereal::make_nvp("k6", cam.getParam()[11]),
+     cereal::make_nvp("rpmax", cam.getRpmax()));
 }
 
 template <class Archive, class Scalar>
 inline void load(Archive& ar, basalt::PinholeRadtan8Camera<Scalar>& cam) {
   Eigen::Matrix<Scalar, 12, 1> intr;
+  Scalar rpmax;
 
   ar(cereal::make_nvp("fx", intr[0]), cereal::make_nvp("fy", intr[1]),
      cereal::make_nvp("cx", intr[2]), cereal::make_nvp("cy", intr[3]),
      cereal::make_nvp("k1", intr[4]), cereal::make_nvp("k2", intr[5]),
      cereal::make_nvp("p1", intr[6]), cereal::make_nvp("p2", intr[7]),
      cereal::make_nvp("k3", intr[8]), cereal::make_nvp("k4", intr[9]),
-     cereal::make_nvp("k5", intr[10]), cereal::make_nvp("k6", intr[11]));
+     cereal::make_nvp("k5", intr[10]), cereal::make_nvp("k6", intr[11]),
+     cereal::make_nvp("rpmax", rpmax));
 
-  cam = basalt::PinholeRadtan8Camera<Scalar>(intr);
+  cam = basalt::PinholeRadtan8Camera<Scalar>(intr, rpmax);
 }
 
 template <class Archive, class Scalar>
