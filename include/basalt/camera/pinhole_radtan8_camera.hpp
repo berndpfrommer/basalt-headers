@@ -336,9 +336,8 @@ class PinholeRadtan8Camera {
     bool in_injective_area = rpmax_ == 0 ? true : rp2 <= rpmax_ * rpmax_;
     bool is_valid = positive_z && in_injective_area;
 
-    // The following derivative formulas were computed automatically with sympy
-    // (with `diff`, `simplify`, and `cse`) from the previous definition. Don't
-    // try to understand them.
+    // The following derivative expressions were computed automatically with
+    // simpy, see radtan8/main_jacobians.py.
 
     if constexpr (!std::is_same_v<DerivedJ3D, std::nullptr_t>) {
       BASALT_ASSERT(d_proj_d_p3d);
@@ -348,12 +347,12 @@ class PinholeRadtan8Camera {
       // clang-format off
       const Scalar v0 = p1 * y;
       const Scalar v1 = p2 * x;
+      const Scalar v2 = z * z * z * z * z * z;
       const Scalar v3 = x * x;
       const Scalar v4 = y * y;
       const Scalar v5 = v3 + v4;
+      const Scalar v6 = z * z * z * z;
       const Scalar v7 = z * z;
-      const Scalar v6 = v7 * v7;
-      const Scalar v2 = v6 * v7;
       const Scalar v8 = k5 * v7;
       const Scalar v9 = k6 * v5;
       const Scalar v10 = k4 * v6 + v5 * (v8 + v9);
@@ -369,14 +368,14 @@ class PinholeRadtan8Camera {
       const Scalar v20 = v16 + v5 * (v14 + 2 * v15);
       const Scalar v21 = 2 * v20;
       const Scalar v22 = v11 * z;
-      const Scalar v23 = 1 / v7;
-      const Scalar v24 = 1 / v12;
+      const Scalar v23 = 1.0 / v7;
+      const Scalar v24 = 1.0 / v12;
       const Scalar v25 = fx * v24;
       const Scalar v26 = v23 * v25;
       const Scalar v27 = p2 * y;
       const Scalar v28 = x * y;
       const Scalar v29 = 2 * v12 * (p1 * x + v27) - 2 * v18 * v28 + 2 * v20 * v22 * v28;
-      const Scalar v30 = 1 / (v7 * z);
+      const Scalar v30 = 1.0 / (z * z * z);
       const Scalar v31 = 2 * x;
       const Scalar v32 = v22 * (v17 + v21 * v5);
       const Scalar v33 = fy * v24;
@@ -384,10 +383,10 @@ class PinholeRadtan8Camera {
 
       const Scalar du_dx = v26 * (v13 * (v0 + 3 * v1) - v19 * v3 + v22 * (v17 + v21 * v3));
       const Scalar du_dy = v26 * v29;
-      const Scalar du_dz = (-v25 * v30 * (v13 * (p2 * (3 * v3 + v4) + v0 * v31) - v18 * v31 * v5 + v32 * x));
+      const Scalar du_dz = -v25 * v30 * (v13 * (p2 * (3 * v3 + v4) + v0 * v31) - v18 * v31 * v5 + v32 * x);
       const Scalar dv_dx = v29 * v34;
       const Scalar dv_dy = v34 * (v13 * (3 * v0 + v1) - v19 * v4 + v22 * (v17 + v21 * v4));
-      const Scalar dv_dz = (-v30 * v33 * (v13 * (p1 * (v3 + 3 * v4) + v27 * v31) - v19 * v5 * y + v32 * y));
+      const Scalar dv_dz = -v30 * v33 * (v13 * (p1 * (v3 + 3 * v4) + v27 * v31) - v19 * v5 * y + v32 * y);
       // clang-format on
 
       (*d_proj_d_p3d)(0, 0) = du_dx;
@@ -404,29 +403,29 @@ class PinholeRadtan8Camera {
       BASALT_ASSERT(d_proj_d_param);
       d_proj_d_param->setZero();
 
+      const Scalar w0 = z * z * z * z * z * z;
       const Scalar w1 = x * x;
       const Scalar w2 = y * y;
       const Scalar w3 = w1 + w2;
+      const Scalar w4 = z * z * z * z;
       const Scalar w5 = z * z;
-      const Scalar w4 = w5 * w5;
-      const Scalar w0 = w4 * w5;
       const Scalar w6 = w0 + w3 * (k1 * w4 + w3 * (k2 * w5 + k3 * w3));
       const Scalar w7 = w6 * z;
       const Scalar w8 = w7 * x;
       const Scalar w9 = 2 * x * y;
       const Scalar w10 = 3 * w1 + w2;
       const Scalar w11 = w0 + w3 * (k4 * w4 + w3 * (k5 * w5 + k6 * w3));
-      const Scalar w12 = 1 / w5;
-      const Scalar w13 = 1 / w11;
+      const Scalar w12 = 1.0 / w5;
+      const Scalar w13 = 1.0 / w11;
       const Scalar w14 = w12 * w13;
-      const Scalar w15 = w3 * z * w5;
+      const Scalar w15 = w3 * (z * z * z);
       const Scalar w16 = fx * x;
       const Scalar w17 = w13 * w16;
       const Scalar w18 = w3 * w3;
       const Scalar w19 = w18 * z;
       const Scalar w20 = fx * w12;
-      const Scalar w21 = w3 * w18 / z;
-      const Scalar w22 = w13 * w13;
+      const Scalar w21 = (w3 * w3 * w3) * 1.0 / z;
+      const Scalar w22 = 1.0 / (w11 * w11);
       const Scalar w23 = w22 * w6;
       const Scalar w24 = w16 * w23;
       const Scalar w25 = w18 * w22;
@@ -436,6 +435,7 @@ class PinholeRadtan8Camera {
       const Scalar w29 = w13 * w28;
       const Scalar w30 = fy * w12;
       const Scalar w31 = w23 * w28;
+
       const Scalar du_fx = w14 * (w11 * (p1 * w9 + p2 * w10) + w8);
       const Scalar du_fy = 0;
       const Scalar du_cx = 1;
@@ -535,7 +535,7 @@ class PinholeRadtan8Camera {
       const Scalar v4 = k4 + v2 * (k5 + v3);
       const Scalar v5 = v2 * v4 + 1;
       const Scalar v6 = v5 * v5;
-      const Scalar v7 = 1 / v6;
+      const Scalar v7 = 1.0 / v6;
       const Scalar v8 = p1 * yp;
       const Scalar v9 = p2 * xp;
       const Scalar v10 = 2 * v6;
