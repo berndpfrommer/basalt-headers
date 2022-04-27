@@ -173,7 +173,7 @@ class PinholeCamera {
   ///
   /// The unprojection function is computed as follows: \f{align}{
   ///    \pi^{-1}(\mathbf{u}, \mathbf{i}) &=
-  ///    \frac{1}{m_x^2 + m_y^2 + 1}
+  ///    \frac{1}{\sqrt{m_x^2 + m_y^2 + 1}}
   ///    \begin{bmatrix}
   ///    m_x \\ m_y \\ 1
   ///    \\ \end{bmatrix}
