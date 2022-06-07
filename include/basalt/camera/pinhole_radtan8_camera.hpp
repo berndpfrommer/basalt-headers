@@ -43,8 +43,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/sophus_utils.hpp>
 
+// clang-format off
+// Scalar might not be a literal type (e.g., when Scalar = ceres::Jet), so we
+// cannot use constexpr. These are undefined at the end of the file.
+#define SN1 Scalar{-1}
+#define S0 Scalar{0}
+#define S1 Scalar{1}
+#define S2 Scalar{2}
+#define S3 Scalar{3}
+// clang-format on
+
 namespace basalt {
 
+using std::abs;
+using std::max;
 using std::sqrt;
 
 /// @brief Pinhole camera model with radial-tangential distortion
@@ -75,7 +87,7 @@ class PinholeRadtan8Camera {
   /// @brief Default constructor with zero intrinsics
   PinholeRadtan8Camera() {
     param_.setZero();
-    rpmax_ = 0;
+    rpmax_ = S0;
   }
 
   /// @brief Construct camera model with given vector of intrinsics
@@ -85,9 +97,9 @@ class PinholeRadtan8Camera {
   /// @param[in] rpmax Optional. Radius of a circle that approximates the valid
   /// projection domain area.
   /// If -1, one will be estimated with @ref computeRpmax().
-  explicit PinholeRadtan8Camera(const VecN& p, Scalar rpmax = -1) {
+  explicit PinholeRadtan8Camera(const VecN& p, Scalar rpmax = SN1) {
     param_ = p;
-    rpmax_ = rpmax == -1 ? computeRpmax() : rpmax;
+    rpmax_ = rpmax == SN1 ? computeRpmax() : rpmax;
   }
 
   /// @brief Cast to different scalar type
@@ -119,15 +131,15 @@ class PinholeRadtan8Camera {
   Scalar computeRpmax() {
     // We want project/unproject to succeed in this scope so we set rpmax_ = 0
     Scalar rpmax_backup = rpmax_;
-    rpmax_ = 0;
+    rpmax_ = S0;
 
     // Good enough constants for the tested calibrations
-    constexpr int MAX_ITERS = 1000;    // Gradient ascent (GA) max iterations
-    constexpr Scalar STEP_SIZE = 0.1;  // GA fixed "learning rate"
-    constexpr Scalar MIN_REL_STEP = 0.0001;  // GA minimum step (relative) size
-    constexpr Scalar NUDGE = 0.1;  // Image center offset for the GA first guess
-    constexpr Scalar CORNER_BOUND_SCALE = 1.5;  // Divergence bounds scaler
-    const Scalar RPMAX_SCALE = 0.85;  // Shrink the resulting circle to be safe
+    const int MAX_ITERS{1000};          // Gradient ascent (GA) max iterations
+    const Scalar STEP_SIZE{0.1};        // GA fixed "learning rate"
+    const Scalar MIN_REL_STEP{0.0001};  // GA minimum step (relative) size
+    const Scalar NUDGE{0.1};  // Image center offset for the GA first guess
+    const Scalar CORNER_BOUND_SCALE{1.5};  // Divergence bounds scaler
+    const Scalar RPMAX_SCALE{0.85};  // Shrink the resulting circle to be safe
 
     const Scalar& fx = param_[0];
     const Scalar& fy = param_[1];
@@ -155,14 +167,14 @@ class PinholeRadtan8Camera {
     // Numeric derivative of rpp2 based on scipy's `approx_derivative`
     auto numeric_rpp2_jacobian = [&rpp2](Vec2 xy) {
       const Scalar eps = Sophus::Constants<Scalar>::epsilonSqrt();
-      const auto sign = [](Scalar n) { return n < 0 ? -1 : 1; };
-      const Scalar hx = eps * sign(xy.x()) * std::max(Scalar{1}, xy.x());
-      const Scalar hy = eps * sign(xy.y()) * std::max(Scalar{1}, xy.y());
+      const auto sign = [](Scalar n) { return n < S0 ? SN1 : S1; };
+      const Scalar hx = eps * sign(xy.x()) * max(S1, xy.x());
+      const Scalar hy = eps * sign(xy.y()) * max(S1, xy.y());
 
       const auto& f = rpp2;
       const Scalar f_xy = f(xy);
-      const Scalar df_dx = (f(xy + Vec2{hx, 0}) - f_xy) / hx;
-      const Scalar df_dy = (f(xy + Vec2{0, hy}) - f_xy) / hy;
+      const Scalar df_dx = (f(xy + Vec2{hx, S0}) - f_xy) / hx;
+      const Scalar df_dy = (f(xy + Vec2{S0, hy}) - f_xy) / hy;
       return Vec2{df_dx, df_dy};
     };
 
@@ -183,10 +195,10 @@ class PinholeRadtan8Camera {
 
     // Approximations for width/height. We don't have access to the actual image
     // size at this point
-    const Scalar w = 2 * cx;
-    const Scalar h = 2 * cy;
-    const std::vector<Vec2> corners = {{0, 0}, {w, 0}, {0, h}, {w, h}};
-    Scalar corners_maxrp2 = -1;
+    const Scalar w = S2 * cx;
+    const Scalar h = S2 * cy;
+    const std::vector<Vec2> corners = {{S0, S0}, {w, S0}, {S0, h}, {w, h}};
+    Scalar corners_maxrp2{-1};
     for (const Vec2& uv : corners) {
       const Scalar corner_rp2 = rp2(uv);
       if (corner_rp2 > corners_maxrp2) {
@@ -221,13 +233,13 @@ class PinholeRadtan8Camera {
 
       const Scalar old_rpp2_x = rpp2_x;
       rpp2_x = rpp2(x);
-      if (std::abs(rpp2_x - old_rpp2_x) < MIN_REL_STEP * old_rpp2_x) {
+      if (abs(rpp2_x - old_rpp2_x) < MIN_REL_STEP * old_rpp2_x) {
         break;
       }
     }
 
     // Finally, this is our rpmax estimate
-    const Scalar rpmax = diverged ? 0 : RPMAX_SCALE * x.norm();
+    const Scalar rpmax = diverged ? S0 : RPMAX_SCALE * x.norm();
 
     rpmax_ = rpmax_backup;
     return rpmax;
@@ -320,10 +332,10 @@ class PinholeRadtan8Camera {
     const Scalar xp = x / z;
     const Scalar yp = y / z;
     const Scalar rp2 = xp * xp + yp * yp;
-    const Scalar cdist = (1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3))) /
-                         (1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6)));
-    const Scalar deltaX = 2 * p1 * xp * yp + p2 * (rp2 + 2 * xp * xp);
-    const Scalar deltaY = 2 * p2 * xp * yp + p1 * (rp2 + 2 * yp * yp);
+    const Scalar cdist = (S1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3))) /
+                         (S1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6)));
+    const Scalar deltaX = S2 * p1 * xp * yp + p2 * (rp2 + S2 * xp * xp);
+    const Scalar deltaY = S2 * p2 * xp * yp + p1 * (rp2 + S2 * yp * yp);
     const Scalar xpp = xp * cdist + deltaX;
     const Scalar ypp = yp * cdist + deltaY;
     const Scalar u = fx * xpp + cx;
@@ -333,7 +345,7 @@ class PinholeRadtan8Camera {
     proj[1] = v;
 
     bool positive_z = z >= Sophus::Constants<Scalar>::epsilonSqrt();
-    bool in_injective_area = rpmax_ == 0 ? true : rp2 <= rpmax_ * rpmax_;
+    bool in_injective_area = rpmax_ == S0 ? true : rp2 <= rpmax_ * rpmax_;
     bool is_valid = positive_z && in_injective_area;
 
     // The following derivative expressions were computed automatically with
@@ -358,35 +370,35 @@ class PinholeRadtan8Camera {
       const Scalar v10 = k4 * v6 + v5 * (v8 + v9);
       const Scalar v11 = v10 * v5 + v2;
       const Scalar v12 = v11 * v11;
-      const Scalar v13 = 2 * v12;
+      const Scalar v13 = S2 * v12;
       const Scalar v14 = k2 * v7;
       const Scalar v15 = k3 * v5;
       const Scalar v16 = k1 * v6 + v5 * (v14 + v15);
       const Scalar v17 = v16 * v5 + v2;
-      const Scalar v18 = v17 * z * (v10 + v5 * (v8 + 2 * v9));
-      const Scalar v19 = 2 * v18;
-      const Scalar v20 = v16 + v5 * (v14 + 2 * v15);
-      const Scalar v21 = 2 * v20;
+      const Scalar v18 = v17 * z * (v10 + v5 * (v8 + S2 * v9));
+      const Scalar v19 = S2 * v18;
+      const Scalar v20 = v16 + v5 * (v14 + S2 * v15);
+      const Scalar v21 = S2 * v20;
       const Scalar v22 = v11 * z;
-      const Scalar v23 = 1.0 / v7;
-      const Scalar v24 = 1.0 / v12;
+      const Scalar v23 = S1 / v7;
+      const Scalar v24 = S1 / v12;
       const Scalar v25 = fx * v24;
       const Scalar v26 = v23 * v25;
       const Scalar v27 = p2 * y;
       const Scalar v28 = x * y;
-      const Scalar v29 = 2 * v12 * (p1 * x + v27) - 2 * v18 * v28 + 2 * v20 * v22 * v28;
-      const Scalar v30 = 1.0 / (z * z * z);
-      const Scalar v31 = 2 * x;
+      const Scalar v29 = S2 * v12 * (p1 * x + v27) - S2 * v18 * v28 + S2 * v20 * v22 * v28;
+      const Scalar v30 = S1 / (z * z * z);
+      const Scalar v31 = S2 * x;
       const Scalar v32 = v22 * (v17 + v21 * v5);
       const Scalar v33 = fy * v24;
       const Scalar v34 = v23 * v33;
 
-      const Scalar du_dx = v26 * (v13 * (v0 + 3 * v1) - v19 * v3 + v22 * (v17 + v21 * v3));
+      const Scalar du_dx = v26 * (v13 * (v0 + S3 * v1) - v19 * v3 + v22 * (v17 + v21 * v3));
       const Scalar du_dy = v26 * v29;
-      const Scalar du_dz = -v25 * v30 * (v13 * (p2 * (3 * v3 + v4) + v0 * v31) - v18 * v31 * v5 + v32 * x);
+      const Scalar du_dz = -v25 * v30 * (v13 * (p2 * (S3 * v3 + v4) + v0 * v31) - v18 * v31 * v5 + v32 * x);
       const Scalar dv_dx = v29 * v34;
-      const Scalar dv_dy = v34 * (v13 * (3 * v0 + v1) - v19 * v4 + v22 * (v17 + v21 * v4));
-      const Scalar dv_dz = -v30 * v33 * (v13 * (p1 * (v3 + 3 * v4) + v27 * v31) - v19 * v5 * y + v32 * y);
+      const Scalar dv_dy = v34 * (v13 * (S3 * v0 + v1) - v19 * v4 + v22 * (v17 + v21 * v4));
+      const Scalar dv_dz = -v30 * v33 * (v13 * (p1 * (v3 + S3 * v4) + v27 * v31) - v19 * v5 * y + v32 * y);
       // clang-format on
 
       (*d_proj_d_p3d)(0, 0) = du_dx;
@@ -412,11 +424,11 @@ class PinholeRadtan8Camera {
       const Scalar w6 = w0 + w3 * (k1 * w4 + w3 * (k2 * w5 + k3 * w3));
       const Scalar w7 = w6 * z;
       const Scalar w8 = w7 * x;
-      const Scalar w9 = 2 * x * y;
-      const Scalar w10 = 3 * w1 + w2;
+      const Scalar w9 = S2 * x * y;
+      const Scalar w10 = S3 * w1 + w2;
       const Scalar w11 = w0 + w3 * (k4 * w4 + w3 * (k5 * w5 + k6 * w3));
-      const Scalar w12 = 1.0 / w5;
-      const Scalar w13 = 1.0 / w11;
+      const Scalar w12 = S1 / w5;
+      const Scalar w13 = S1 / w11;
       const Scalar w14 = w12 * w13;
       const Scalar w15 = w3 * (z * z * z);
       const Scalar w16 = fx * x;
@@ -424,22 +436,22 @@ class PinholeRadtan8Camera {
       const Scalar w18 = w3 * w3;
       const Scalar w19 = w18 * z;
       const Scalar w20 = fx * w12;
-      const Scalar w21 = (w3 * w3 * w3) * 1.0 / z;
-      const Scalar w22 = 1.0 / (w11 * w11);
+      const Scalar w21 = (w3 * w3 * w3) * S1 / z;
+      const Scalar w22 = S1 / (w11 * w11);
       const Scalar w23 = w22 * w6;
       const Scalar w24 = w16 * w23;
       const Scalar w25 = w18 * w22;
       const Scalar w26 = w7 * y;
-      const Scalar w27 = w1 + 3 * w2;
+      const Scalar w27 = w1 + S3 * w2;
       const Scalar w28 = fy * y;
       const Scalar w29 = w13 * w28;
       const Scalar w30 = fy * w12;
       const Scalar w31 = w23 * w28;
 
       const Scalar du_fx = w14 * (w11 * (p1 * w9 + p2 * w10) + w8);
-      const Scalar du_fy = 0;
-      const Scalar du_cx = 1;
-      const Scalar du_cy = 0;
+      const Scalar du_fy = S0;
+      const Scalar du_cx = S1;
+      const Scalar du_cy = S0;
       const Scalar du_k1 = w15 * w17;
       const Scalar du_k2 = w17 * w19;
       const Scalar du_p1 = w20 * w9;
@@ -448,10 +460,10 @@ class PinholeRadtan8Camera {
       const Scalar du_k4 = -w15 * w24;
       const Scalar du_k5 = -fx * w25 * w8;
       const Scalar du_k6 = -w21 * w24;
-      const Scalar dv_fx = 0;
+      const Scalar dv_fx = S0;
       const Scalar dv_fy = w14 * (w11 * (p1 * w27 + p2 * w9) + w26);
-      const Scalar dv_cx = 0;
-      const Scalar dv_cy = 1;
+      const Scalar dv_cx = S0;
+      const Scalar dv_cy = S1;
       const Scalar dv_k1 = w15 * w29;
       const Scalar dv_k2 = w19 * w29;
       const Scalar dv_p1 = w27 * w30;
@@ -515,10 +527,10 @@ class PinholeRadtan8Camera {
     const Scalar xp = undist.x();
     const Scalar yp = undist.y();
     const Scalar rp2 = xp * xp + yp * yp;
-    const Scalar cdist = (1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3))) /
-                         (1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6)));
-    const Scalar deltaX = 2 * p1 * xp * yp + p2 * (rp2 + 2 * xp * xp);
-    const Scalar deltaY = 2 * p2 * xp * yp + p1 * (rp2 + 2 * yp * yp);
+    const Scalar cdist = (S1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3))) /
+                         (S1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6)));
+    const Scalar deltaX = S2 * p1 * xp * yp + p2 * (rp2 + S2 * xp * xp);
+    const Scalar deltaY = S2 * p2 * xp * yp + p1 * (rp2 + S2 * yp * yp);
     const Scalar xpp = xp * cdist + deltaX;
     const Scalar ypp = yp * cdist + deltaY;
     dist.x() = xpp;
@@ -533,29 +545,29 @@ class PinholeRadtan8Camera {
       const Scalar v2 = v0 + v1;
       const Scalar v3 = k6 * v2;
       const Scalar v4 = k4 + v2 * (k5 + v3);
-      const Scalar v5 = v2 * v4 + 1;
+      const Scalar v5 = v2 * v4 + S1;
       const Scalar v6 = v5 * v5;
-      const Scalar v7 = 1.0 / v6;
+      const Scalar v7 = S1 / v6;
       const Scalar v8 = p1 * yp;
       const Scalar v9 = p2 * xp;
-      const Scalar v10 = 2 * v6;
+      const Scalar v10 = S2 * v6;
       const Scalar v11 = k3 * v2;
       const Scalar v12 = k1 + v2 * (k2 + v11);
-      const Scalar v13 = v12 * v2 + 1;
-      const Scalar v14 = v13 * (v2 * (k5 + 2 * v3) + v4);
-      const Scalar v15 = 2 * v14;
-      const Scalar v16 = v12 + v2 * (k2 + 2 * v11);
-      const Scalar v17 = 2 * v16;
+      const Scalar v13 = v12 * v2 + S1;
+      const Scalar v14 = v13 * (v2 * (k5 + S2 * v3) + v4);
+      const Scalar v15 = S2 * v14;
+      const Scalar v16 = v12 + v2 * (k2 + S2 * v11);
+      const Scalar v17 = S2 * v16;
       const Scalar v18 = xp * yp;
       const Scalar v19 =
-          2 * v7 * (-v14 * v18 + v16 * v18 * v5 + v6 * (p1 * xp + p2 * yp));
+          S2 * v7 * (-v14 * v18 + v16 * v18 * v5 + v6 * (p1 * xp + p2 * yp));
 
       const Scalar dxpp_dxp =
-          v7 * (-v0 * v15 + v10 * (v8 + 3 * v9) + v5 * (v0 * v17 + v13));
+          v7 * (-v0 * v15 + v10 * (v8 + S3 * v9) + v5 * (v0 * v17 + v13));
       const Scalar dxpp_dyp = v19;
       const Scalar dypp_dxp = v19;
       const Scalar dypp_dyp =
-          v7 * (-v1 * v15 + v10 * (3 * v8 + v9) + v5 * (v1 * v17 + v13));
+          v7 * (-v1 * v15 + v10 * (S3 * v8 + v9) + v5 * (v1 * v17 + v13));
 
       (*d_dist_d_undist)(0, 0) = dxpp_dxp;
       (*d_dist_d_undist)(0, 1) = dxpp_dyp;
@@ -647,19 +659,19 @@ class PinholeRadtan8Camera {
     Scalar yp = y0;
     for (int i = 0; i < N; i++) {
       const Scalar rp2 = xp * xp + yp * yp;
-      const Scalar icdist = (1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6))) /
-                            (1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3)));
-      if (icdist <= 0) {
+      const Scalar icdist = (S1 + rp2 * (k4 + rp2 * (k5 + rp2 * k6))) /
+                            (S1 + rp2 * (k1 + rp2 * (k2 + rp2 * k3)));
+      if (icdist <= S0) {
         return false;  // OpenCV just sets xp=x0, yp=y0 instead
       }
-      const Scalar deltaX = 2 * p1 * xp * yp + p2 * (rp2 + 2 * xp * xp);
-      const Scalar deltaY = 2 * p2 * xp * yp + p1 * (rp2 + 2 * yp * yp);
+      const Scalar deltaX = S2 * p1 * xp * yp + p2 * (rp2 + S2 * xp * xp);
+      const Scalar deltaY = S2 * p2 * xp * yp + p1 * (rp2 + S2 * yp * yp);
       xp = (x0 - deltaX) * icdist;
       yp = (y0 - deltaY) * icdist;
     }
 #endif
 
-    const Scalar norm_inv = 1 / sqrt(xp * xp + yp * yp + 1);
+    const Scalar norm_inv = S1 / sqrt(xp * xp + yp * yp + S1);
     p3d.setZero();
     p3d[0] = xp * norm_inv;
     p3d[1] = yp * norm_inv;
@@ -674,7 +686,7 @@ class PinholeRadtan8Camera {
     UNUSED(d_p3d_d_param);
 
     const Scalar rp2 = xp * xp + yp * yp;
-    bool in_injective_area = rpmax_ == 0 ? true : rp2 <= rpmax_ * rpmax_;
+    bool in_injective_area = rpmax_ == S0 ? true : rp2 <= rpmax_ * rpmax_;
     bool is_valid = in_injective_area;
 
     return is_valid;
@@ -691,7 +703,7 @@ class PinholeRadtan8Camera {
     param_[1] = init[1];
     param_[2] = init[2];
     param_[3] = init[3];
-    rpmax_ = 0;  // No distortion, so biyective
+    rpmax_ = S0;  // No distortion, so biyective
   }
 
   /// @brief Increment intrinsic parameters by inc
@@ -747,3 +759,9 @@ class PinholeRadtan8Camera {
 };
 
 }  // namespace basalt
+
+#undef SN1
+#undef S0
+#undef S1
+#undef S2
+#undef S3
