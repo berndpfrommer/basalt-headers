@@ -97,29 +97,23 @@ bionic-release-compile:
   <<: *compile_and_test_definition
   image: vladyslavusenko/b_image_bionic:latest
 
-bigsur-relwithdebinfo-compile:
+monterey-arm-brewedclang-asan-build:
   <<: *compile_and_test_definition
-  tags: [macos, "11", x86_64]
+  tags: [macos, "12", arm64]
   variables:
-    BUILD_TYPE: RelWithDebInfo
-
-bigsur-brewedclang-asan-build:
-  <<: *compile_and_test_definition
-  tags: [macos, "11", x86_64]
-  variables:
-    CC: /usr/local/opt/llvm/bin/clang
-    CXX: /usr/local/opt/llvm/bin/clang++
+    CC: /opt/homebrew/opt/llvm/bin/clang
+    CXX: /opt/homebrew/opt/llvm/bin/clang++
     BUILD_TYPE: SanitizerRelWithDebInfo
 
-catalina-asan-build:
+monterey-arm-asan-build:
   <<: *compile_and_test_definition
-  tags: [macos, "10.15"]
+  tags: [macos, "12", arm64]
   variables:
     BUILD_TYPE: SanitizerRelWithDebInfo
 
-catalina-build-no-builtin:
+monterey-arm-build-no-builtin:
   <<: *compile_and_test_no_builtin_definition
-  tags: [macos, "10.15"]
+  tags: [macos, "12", arm64]
 
 monterey-arm-relwithdebinfo-compile:
   <<: *compile_and_test_definition
