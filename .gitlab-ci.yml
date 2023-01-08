@@ -1,4 +1,4 @@
-image: vladyslavusenko/b_image_focal:latest
+image: vladyslavusenko/b_image_jammy:latest
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -42,7 +42,7 @@ variables:
     - ctest --output-on-failure
 
 # main build with benchmark and coverage
-focal-release-compile:
+jammy-release-compile:
   <<: *prepare_docker_definition
   stage: build
   script:
@@ -66,29 +66,29 @@ focal-release-compile:
     paths:
     - benchmark_camera.txt
 
-focal-debug-compile:
+jammy-debug-compile:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
   variables:
     BUILD_TYPE: Debug
 
-focal-relwithdebinfo-compile:
+jammy-relwithdebinfo-compile:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
   variables:
     BUILD_TYPE: RelWithDebInfo
 
-focal-asan-build:
+jammy-asan-build:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
   variables:
-    CC: clang-12
-    CXX: clang++-12
+    CC: clang-15
+    CXX: clang++-15
     BUILD_TYPE: SanitizerRelWithDebInfo
     # LeakSanitizer doesn't work in (non-priviliged) container
     ASAN_OPTIONS: "detect_leaks=0"
 
-focal-release-no-builtin:
+jammy-release-no-builtin:
   <<: *prepare_docker_definition
   <<: *compile_and_test_no_builtin_definition
 
@@ -96,6 +96,11 @@ bionic-release-compile:
   <<: *prepare_docker_definition
   <<: *compile_and_test_definition
   image: vladyslavusenko/b_image_bionic:latest
+
+focal-release-compile:
+  <<: *prepare_docker_definition
+  <<: *compile_and_test_definition
+  image: vladyslavusenko/b_image_focal:latest
 
 monterey-arm-brewedclang-asan-build:
   <<: *compile_and_test_definition
