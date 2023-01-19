@@ -110,7 +110,7 @@ if(NOT TARGET Sophus::Sophus)
     message(STATUS "Including internal Sophus from submodule")
     set(BUILD_SOPHUS_TESTS OFF CACHE BOOL "disable BUILD_SOPHUS_TESTS")
     set(BUILD_SOPHUS_EXAMPLES OFF CACHE BOOL "disable BUILD_SOPHUS_EXAMPLES")
-    add_subdirectory(thirdparty/Sophus EXCLUDE_FROM_ALL)
+    add_subdirectory(thirdparty/Sophus)
   else()
     message(STATUS "Finding external Sophus")
     find_package(Sophus REQUIRED)
@@ -124,7 +124,7 @@ option(BASALT_BUILTIN_CEREAL "Use builtin Cereal from submodule" ON)
 if(NOT TARGET cereal::cereal)
   if(BASALT_BUILTIN_CEREAL)
     message(STATUS "Including internal Cereal from submodule")
-    add_subdirectory(thirdparty/cereal EXCLUDE_FROM_ALL)
+    add_subdirectory(thirdparty/cereal)
   else()
     message(STATUS "Finding external Cereal")
     find_package(cereal REQUIRED)
@@ -147,37 +147,70 @@ target_include_directories(basalt-headers INTERFACE
 # List all header files with target_sources.
 # This ensures, e.g., that QtCreator >= 6.0 properly recognize these headers to belong to the project.
 # To support cmake < 3.13, use absolute paths (see: https://crascit.com/2016/01/31/enhanced-source-file-handling-with-target_sources/)
+set(ACTUAL_INCLUDE_DIR "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>$<INSTALL_INTERFACE:include>")
+
 target_sources(basalt-headers
   INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/calib_bias.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/calibration/calibration.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/bal_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/camera_static_assert.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/double_sphere_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/extended_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/fov_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/generic_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/kannala_brandt_camera4.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/pinhole_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/stereographic_param.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/camera/unified_camera.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/image/image.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/image/image_pyr.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/imu/imu_types.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/imu/preintegration.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/serialization/eigen_io.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/serialization/headers_serialization.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/ceres_local_param.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/ceres_spline_helper.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/rd_spline.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/se3_spline.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/so3_spline.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/spline/spline_common.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/assert.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/eigen_utils.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/hash.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/sophus_utils.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/calibration/calib_bias.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/calibration/calibration.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/bal_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/camera_static_assert.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/double_sphere_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/extended_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/fov_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/generic_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/kannala_brandt_camera4.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/pinhole_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/stereographic_param.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/camera/unified_camera.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/image/image.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/image/image_pyr.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/imu/imu_types.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/imu/preintegration.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/serialization/eigen_io.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/serialization/headers_serialization.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/ceres_local_param.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/ceres_spline_helper.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/rd_spline.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/se3_spline.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/so3_spline.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/spline/spline_common.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/utils/assert.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/utils/eigen_utils.hpp
+    ${ACTUAL_INCLUDE_DIR}/basalt/utils/hash.h
+    ${ACTUAL_INCLUDE_DIR}/basalt/utils/sophus_utils.hpp
 )
+
+install(TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}Targets
+  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+  INCLUDES DESTINATION include)
+ 
+# generate the ConfigVersion.cmake file that will be included by Config.cmake
+include(CMakePackageConfigHelpers)
+
+write_basic_package_version_file(
+  ${PROJECT_NAME}ConfigVersion.cmake
+  VERSION ${EXPORT_LIBRARY_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+# generate the *Config.cmake file
+configure_file(cmake/${PROJECT_NAME}Config.cmake.in ${PROJECT_NAME}Config.cmake @ONLY)
+
+# generate Targets.cmake file from exports learned during the installation
+install(EXPORT ${PROJECT_NAME}Targets
+  FILE ${PROJECT_NAME}Targets.cmake
+  NAMESPACE ${PROJECT_NAME}::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+# install the generated version and config files
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+install(DIRECTORY include/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR BASALT_HEADERS_BUILD_TESTING) AND BUILD_TESTING)
   enable_testing()
